@@ -1,15 +1,18 @@
+require "cocoapods-timeconsuming-details/version"
+
 module Pod
-    class Installer
-		    def timing (method, *argv) #method(:method_name)
+class Installer
+
+        def timing (method, *argv) #method(:method_name)
             
             start_time = Time.new
 
             if argv and (argv.length != 0)
-               	method.call(*argv)
+                method.call(*argv)
             else
-            	method.call
+              method.call
             end
-            	
+              
             cost_time = (Time.new.to_f - start_time.to_f)*1000
 
             return cost_time.to_i.to_s
@@ -38,11 +41,11 @@ module Pod
             puts "=> resolve_dependencies cost : " + timing(method(:resolve_dependencies)) + "ms";
             puts "=> download_dependencies cost : " + timing(method(:download_dependencies)) + "ms";
             puts "=> generate_pods_project cost : " + timing(method(:generate_pods_project)) + "ms";
-            puts "=> integrate_user_project cost : " + timing(method(:integrate_user_project)) + "ms"; if config.integrate_targets?
+            puts "=> integrate_user_project cost : " + timing(method(:integrate_user_project)) + "ms" if config.integrate_targets?
             puts "=> perform_post_install_actions cost : " + timing(method(:perform_post_install_actions)) + "ms";
 
-            cost_time = (Time.new.to_f - start_time.to_f)*1000
-            puts "\e[32m Total cost : #{cost_time.to_i.to_s} ms \e[0m"  
+            cost_time = (Time.new.to_f - start_time.to_f)*1000;
+            puts "\e[32m Total cost : #{cost_time.to_i.to_s} ms \e[0m" ;
         end
 
         def resolve_dependencies
@@ -74,6 +77,7 @@ module Pod
             write_lockfiles
           end
         end
+
 
         #-------------------------------------------------------------------------#
 
@@ -119,7 +123,8 @@ module Pod
                 title = "Installing #{spec}"
               end
               UI.titled_section(title.green, title_options) do
-                install_source_of_pod(spec.name)
+                # install_source_of_pod(spec.name)
+                puts "Installing #{spec.name} cost :" + timing(method(:install_source_of_pod), spec.name) + "ms";
               end
             else
               UI.titled_section("Using #{spec}", title_options)
@@ -276,6 +281,5 @@ module Pod
         end
 
         #-------------------------------------------------------------------------#
-
     end
 end

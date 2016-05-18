@@ -404,8 +404,6 @@ module Pod
 	      end
 	    end
 
-	    DEFAULT_PLUGINS = { 'cocoapods-stats' => {} }
-
 	    # Returns the plugins that should be run, as indicated by the default
 	    # plugins and the podfile's plugins
 	    #
