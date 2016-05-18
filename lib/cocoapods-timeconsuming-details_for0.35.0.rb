@@ -35,21 +35,14 @@ module Pod
             start_time = Time.new  
 
             puts "=> prepare cost : " + timing(method(:prepare)) + "ms";
-            puts "=> prepare cost : " + timing(method(:resolve_dependencies)) + "ms";
-            puts "=> prepare cost : " + timing(method(:download_dependencies)) + "ms";
-            puts "=> prepare cost : " + timing(method(:generate_pods_project)) + "ms";
-            puts "=> prepare cost : " + timing(method(:integrate_user_project)) + "ms"; if config.integrate_targets?
-            puts "=> prepare cost : " + timing(method(:perform_post_install_actions)) + "ms";
+            puts "=> resolve_dependencies cost : " + timing(method(:resolve_dependencies)) + "ms";
+            puts "=> download_dependencies cost : " + timing(method(:download_dependencies)) + "ms";
+            puts "=> generate_pods_project cost : " + timing(method(:generate_pods_project)) + "ms";
+            puts "=> integrate_user_project cost : " + timing(method(:integrate_user_project)) + "ms"; if config.integrate_targets?
+            puts "=> perform_post_install_actions cost : " + timing(method(:perform_post_install_actions)) + "ms";
 
             cost_time = (Time.new.to_f - start_time.to_f)*1000
             puts "\e[32m Total cost : #{cost_time.to_i.to_s} ms \e[0m"  
-        end
-
-        def prepare
-          UI.message 'Preparing' do
-            sandbox.prepare
-            Migrator.migrate(sandbox)
-          end
         end
 
         def resolve_dependencies
@@ -106,73 +99,6 @@ module Pod
           analyzer.update = update
           @analysis_result = analyzer.analyze
           @aggregate_targets = analyzer.result.targets
-        end
-
-        # Ensures that the white-listed build configurations are known to prevent
-        # silent typos.
-        #
-        # @raise  If a unknown user configuration is found.
-        #
-        def validate_build_configurations
-          whitelisted_configs = pod_targets.map do |target|
-            target.target_definition.all_whitelisted_configurations.map(&:downcase)
-          end.flatten.uniq
-          all_user_configurations = analysis_result.all_user_build_configurations.keys.map(&:downcase)
-
-          remainder = whitelisted_configs - all_user_configurations
-          unless remainder.empty?
-            raise Informative, "Unknown #{'configuration'.pluralize(remainder.size)} whitelisted: #{remainder.sort.to_sentence}."
-          end
-        end
-
-        # Prepares the Pods folder in order to be compatible with the most recent
-        # version of CocoaPods.
-        #
-        # @return [void]
-        #
-        def prepare_for_legacy_compatibility
-          # move_target_support_files_if_needed
-          # move_Local_Podspecs_to_Podspecs_if_needed
-          # move_pods_to_sources_folder_if_needed
-        end
-
-        # @return [void] In this step we clean all the folders that will be
-        #         regenerated from scratch and any file which might not be
-        #         overwritten.
-        #
-        # @todo   [#247] Clean the headers of only the pods to install.
-        #
-        def clean_sandbox
-          sandbox.public_headers.implode!
-          pod_targets.each do |pod_target|
-            pod_target.build_headers.implode!
-          end
-
-          unless sandbox_state.deleted.empty?
-            title_options = { :verbose_prefix => '-> '.red }
-            sandbox_state.deleted.each do |pod_name|
-              UI.titled_section("Removing #{pod_name}".red, title_options) do
-                sandbox.clean_pod(pod_name)
-              end
-            end
-          end
-        end
-
-        # TODO: the file accessor should be initialized by the sandbox as they
-        #       created by the Pod source installer as well.
-        #
-        def create_file_accessors
-          aggregate_targets.each do |target|
-            target.pod_targets.each do |pod_target|
-              pod_root = sandbox.pod_dir(pod_target.root_spec.name)
-              path_list = Sandbox::PathList.new(pod_root)
-              file_accessors = pod_target.specs.map do |spec|
-                Sandbox::FileAccessor.new(path_list, spec.consumer(pod_target.platform))
-              end
-              pod_target.file_accessors ||= []
-              pod_target.file_accessors.concat(file_accessors)
-            end
-          end
         end
 
         # Downloads, installs the documentation and cleans the sources of the Pods
@@ -247,24 +173,6 @@ module Pod
         def run_plugins_post_install_hooks
           context = HooksContext.generate(sandbox, aggregate_targets)
           HooksManager.run(:post_install, context)
-        end
-
-        # Prints a warning for any pods that are deprecated
-        #
-        # @return [void]
-        #
-        def warn_for_deprecations
-          deprecated_pods = root_specs.select do |spec|
-            spec.deprecated || spec.deprecated_in_favor_of
-          end
-          deprecated_pods.each do |spec|
-            if spec.deprecated_in_favor_of
-              UI.warn "#{spec.name} has been deprecated in " \
-                "favor of #{spec.deprecated_in_favor_of}"
-            else
-              UI.warn "#{spec.name} has been deprecated"
-            end
-          end
         end
 
         # Creates the Pods project from scratch if it doesn't exists.
@@ -367,201 +275,7 @@ module Pod
           end
         end
 
-        # Writes the Pods project to the disk.
-        #
-        # @return [void]
-        #
-        def write_pod_project
-          UI.message "- Writing Xcode project file to #{UI.path sandbox.project_path}" do
-            pods_project.pods.remove_from_project if pods_project.pods.empty?
-            pods_project.development_pods.remove_from_project if pods_project.development_pods.empty?
-            pods_project.sort(:groups_position => :below)
-            pods_project.recreate_user_schemes(false)
-            pods_project.save
-          end
-        end
-
-        # Writes the Podfile and the lock files.
-        #
-        # @todo   Pass the checkout options to the Lockfile.
-        #
-        # @return [void]
-        #
-        def write_lockfiles
-          external_source_pods = podfile.dependencies.select(&:external_source).map(&:root_name).uniq
-          checkout_options = sandbox.checkout_sources.select { |root_name, _| external_source_pods.include? root_name }
-          @lockfile = Lockfile.generate(podfile, analysis_result.specifications, checkout_options)
-
-          UI.message "- Writing Lockfile in #{UI.path config.lockfile_path}" do
-            @lockfile.write_to_disk(config.lockfile_path)
-          end
-
-          UI.message "- Writing Manifest in #{UI.path sandbox.manifest_path}" do
-            @lockfile.write_to_disk(sandbox.manifest_path)
-          end
-        end
-
-        # Integrates the user projects adding the dependencies on the CocoaPods
-        # libraries, setting them up to use the xcconfigs and performing other
-        # actions. This step is also responsible of creating the workspace if
-        # needed.
-        #
-        # @return [void]
-        #
-        # @todo   [#397] The libraries should be cleaned and the re-added on every
-        #         installation. Maybe a clean_user_project phase should be added.
-        #         In any case it appears to be a good idea store target definition
-        #         information in the lockfile.
-        #
-        def integrate_user_project
-          UI.section "Integrating client #{'project'.pluralize(aggregate_targets.map(&:user_project_path).uniq.count) }" do
-            installation_root = config.installation_root
-            integrator = UserProjectIntegrator.new(podfile, sandbox, installation_root, aggregate_targets)
-            integrator.integrate!
-          end
-        end
-
         #-------------------------------------------------------------------------#
 
-        private
-
-        # @!group Hooks
-
-        # Runs the pre install hooks of the installed specs and of the Podfile.
-        #
-        # @return [void]
-        #
-        def run_pre_install_hooks
-          UI.message '- Running pre install hooks' do
-            executed = run_podfile_pre_install_hook
-            UI.message '- Podfile' if executed
-          end
-        end
-
-        # Runs the pre install hook of the Podfile
-        #
-        # @raise  Raises an informative if the hooks raises.
-        #
-        # @return [Bool] Whether the hook was run.
-        #
-        def run_podfile_pre_install_hook
-          podfile.pre_install!(installer_rep)
-        rescue => e
-          raise Informative, 'An error occurred while processing the pre-install ' \
-            'hook of the Podfile.' \
-            "\n\n#{e.message}\n\n#{e.backtrace * "\n"}"
-        end
-
-        # Runs the post install hooks of the installed specs and of the Podfile.
-        #
-        # @note   Post install hooks run _before_ saving of project, so that they
-        #         can alter it before it is written to the disk.
-        #
-        # @return [void]
-        #
-        def run_podfile_post_install_hooks
-          UI.message '- Running post install hooks' do
-            executed = run_podfile_post_install_hook
-            UI.message '- Podfile' if executed
-          end
-        end
-
-        # Runs the post install hook of the Podfile
-        #
-        # @raise  Raises an informative if the hooks raises.
-        #
-        # @return [Bool] Whether the hook was run.
-        #
-        def run_podfile_post_install_hook
-          podfile.post_install!(installer_rep)
-        rescue => e
-          raise Informative, 'An error occurred while processing the post-install ' \
-            'hook of the Podfile.' \
-            "\n\n#{e.message}\n\n#{e.backtrace * "\n"}"
-        end
-
-        #-------------------------------------------------------------------------#
-
-        public
-
-        # @!group Hooks Data
-
-        # @return [InstallerRepresentation]
-        #
-        def installer_rep
-          Hooks::InstallerRepresentation.new(self)
-        end
-
-        # @return [PodRepresentation] The hook representation of a Pod.
-        #
-        # @param  [String] pod
-        #         The name of the pod.
-        #
-        # @return [PodRepresentation] The pod representation.
-        #
-        def pod_rep(pod)
-          all_file_accessors = pod_targets.map(&:file_accessors).flatten.compact
-          file_accessors = all_file_accessors.select { |fa| fa.spec.root.name == pod }
-          Hooks::PodRepresentation.new(pod, file_accessors)
-        end
-
-        # @return [LibraryRepresentation]
-        #
-        def library_rep(aggregate_target)
-          Hooks::LibraryRepresentation.new(sandbox, aggregate_target)
-        end
-
-        # @return [Array<LibraryRepresentation>]
-        #
-        def library_reps
-          @library_reps ||= aggregate_targets.map { |lib| library_rep(lib) }
-        end
-
-        # @return [Array<PodRepresentation>]
-        #
-        def pod_reps
-          root_specs.sort_by(&:name).map { |spec| pod_rep(spec.name) }
-        end
-
-        # Returns the libraries which use the given specification.
-        #
-        # @param  [Specification] spec
-        #         The specification for which the client libraries are needed.
-        #
-        # @return [Array<Library>] The library.
-        #
-        def libraries_using_spec(spec)
-          aggregate_targets.select do |aggregate_target|
-            aggregate_target.pod_targets.any? { |pod_target| pod_target.specs.include?(spec) }
-          end
-        end
-
-        # @return [Array<Library>] The libraries generated by the installation
-        #         process.
-        #
-        def pod_targets
-          aggregate_targets.map(&:pod_targets).flatten
-        end
-
-        #-------------------------------------------------------------------------#
-
-        private
-
-        # @!group Private helpers
-
-        # @return [Array<Specification>] All the root specifications of the
-        #         installation.
-        #
-        def root_specs
-          analysis_result.specifications.map(&:root).uniq
-        end
-
-        # @return [SpecsState] The state of the sandbox returned by the analyzer.
-        #
-        def sandbox_state
-          analysis_result.sandbox_state
-        end
-
-        #-------------------------------------------------------------------------#
     end
 end
