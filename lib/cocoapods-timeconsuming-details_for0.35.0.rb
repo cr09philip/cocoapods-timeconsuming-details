@@ -51,18 +51,18 @@ class Installer
         def resolve_dependencies
           UI.section 'Analyzing dependencies' do
             puts "===> analyze cost : " + timing(method(:analyze)) +" ms";
-            validate_build_configurations
-            prepare_for_legacy_compatibility
-            clean_sandbox
+            puts "===> validate_build_configurations cost : " + timing(method(:validate_build_configurations)) +" ms";
+            puts "===> prepare_for_legacy_compatibility cost : " + timing(method(:prepare_for_legacy_compatibility)) +" ms";
+            puts "===> clean_sandbox cost : " + timing(method(:clean_sandbox)) +" ms";
           end
         end
 
         def download_dependencies
           UI.section 'Downloading dependencies' do
-            create_file_accessors
-            install_pod_sources
-            run_pre_install_hooks
-            clean_pod_sources
+            puts "===> create_file_accessors cost : " + timing(method(:create_file_accessors)) +" ms";
+            puts "===> install_pod_sources cost : " + timing(method(:install_pod_sources)) +" ms";
+            puts "===> run_pre_install_hooks cost : " + timing(method(:run_pre_install_hooks)) +" ms";
+            puts "===> clean_pod_sources cost : " + timing(method(:clean_pod_sources)) +" ms";
           end
         end
 
@@ -102,7 +102,7 @@ class Installer
               end
               UI.titled_section(title.green, title_options) do
                 # install_source_of_pod(spec.name)
-                puts "===> Installing #{spec.name} cost :" + timing(method(:install_source_of_pod), spec.name) + " ms";
+                puts "=====> Installing #{spec.name} cost : " + timing(method(:install_source_of_pod), spec.name) + " ms";
               end
             else
               UI.titled_section("Using #{spec}", title_options)
@@ -120,13 +120,14 @@ class Installer
             pod_targets.sort_by(&:name).each do |pod_target|
               next if pod_target.target_definition.dependencies.empty?
               target_installer = PodTargetInstaller.new(sandbox, pod_target)
-              puts "===> install pod target #{target_installer.name} cost : " + timing(target_installer.method(:install!)) + " ms";
+              # target_installer.install!
+              puts "=====> install pod target #{pod_target.name} cost : " + timing(target_installer.method(:install!)) + " ms";
             end
 
             aggregate_targets.sort_by(&:name).each do |target|
               next if target.target_definition.dependencies.empty?
               target_installer = AggregateTargetInstaller.new(sandbox, target)
-              puts "===> install aggregate target #{target_installer.name} cost : " + timing(target_installer.method(:install!)) + " ms";
+              puts "=====> install aggregate target #{target.name} cost : " + timing(target_installer.method(:install!)) + " ms";
               # target_installer.install!
             end
 

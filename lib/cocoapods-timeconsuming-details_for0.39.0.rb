@@ -110,11 +110,13 @@ module Pod
 	            title = "Installing #{spec}"
 	          end
 	          UI.titled_section(title.green, title_options) do
-	            puts "=====> Installing #{spec} cost : " + timing(method(:install_source_of_pod), spec.name) + " ms";
+	            puts "=====> Install #{spec} cost : " + timing(method(:install_source_of_pod), spec.name) + " ms";
+	            # install_source_of_pod(spec.name)
 	          end
 	        else
 	          UI.titled_section("Using #{spec}", title_options) do
 	            puts "=====> Using #{spec} cost : " + timing(method(:create_pod_installer), spec.name) + " ms";
+	            # create_pod_installer(spec.name)
 	          end
 	        end
 	      end
