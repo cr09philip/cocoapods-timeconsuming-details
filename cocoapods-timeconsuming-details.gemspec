@@ -6,7 +6,7 @@ require 'cocoapods-timeconsuming-details/version'
 Gem::Specification.new do |spec|
   spec.name          = "cocoapods-timeconsuming-details"
   spec.version       = CocoapodsTimeconsumingDetails::VERSION
-  spec.authors       = ["philip.lpf"]
+  spec.authors       = ["圆寸"]
   spec.email         = ["philip.lpf@alibaba-inc.com"]
 
   spec.summary       = %q{cocoapods install/update timeconsuming details.}
@@ -17,7 +17,7 @@ Gem::Specification.new do |spec|
   # Prevent pushing this gem to RubyGems.org. To allow pushes either set the 'allowed_push_host'
   # to allow pushing to a single host or delete this section to allow pushing to any host.
   if spec.respond_to?(:metadata)
-    spec.metadata['allowed_push_host'] = "https://ruby.taobao.com"
+    spec.metadata['allowed_push_host'] = "https://rubygems.org"
   else
     raise "RubyGems 2.0 or newer is required to protect against public gem pushes."
   end
