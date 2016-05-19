@@ -10,8 +10,8 @@ Gem::Specification.new do |spec|
   spec.email         = ["philip.lpf@alibaba-inc.com"]
 
   spec.summary       = %q{cocoapods install/update timeconsuming details.}
-  spec.description   = %q{cocoapods install/update timeconsuming details.}
-  spec.homepage      = "http://github.com"
+  spec.description   = %q{cocoapods install/update timeconsuming details. it will be conflicted with cocoapods-timeconsuming plugin.}
+  spec.homepage      = "https://github.com/cr09philip/cocoapods-timeconsuming-details"
   spec.license       = "MIT"
 
   # Prevent pushing this gem to RubyGems.org. To allow pushes either set the 'allowed_push_host'
